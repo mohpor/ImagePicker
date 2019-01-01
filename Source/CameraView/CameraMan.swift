@@ -149,7 +149,7 @@ class CameraMan {
     }
   }
 
-  func takePhoto(_ previewLayer: AVCaptureVideoPreviewLayer, location: CLLocation?, completion: (() -> Void)? = nil) {
+  func takePhoto(_ previewLayer: AVCaptureVideoPreviewLayer, location: CLLocation?, completion: ((UIImage?) -> Void)? = nil) {
     guard let connection = stillImageOutput?.connection(with: AVMediaType.video) else { return }
 
     connection.videoOrientation = Helper.videoOrientation()
@@ -161,7 +161,7 @@ class CameraMan {
           let image = UIImage(data: imageData)
           else {
             DispatchQueue.main.async {
-              completion?()
+              completion?(nil)
             }
             return
         }
@@ -171,14 +171,18 @@ class CameraMan {
     }
   }
 
-  func savePhoto(_ image: UIImage, location: CLLocation?, completion: (() -> Void)? = nil) {
+  func savePhoto(_ image: UIImage, location: CLLocation?, completion: ((UIImage) -> Void)? = nil) {
+    guard PHPhotoLibrary.authorizationStatus() == .authorized else {
+      completion?(image)
+      return
+    }
     PHPhotoLibrary.shared().performChanges({
       let request = PHAssetChangeRequest.creationRequestForAsset(from: image)
       request.creationDate = Date()
       request.location = location
       }, completionHandler: { (_, _) in
         DispatchQueue.main.async {
-          completion?()
+          completion?(image)
         }
     })
   }

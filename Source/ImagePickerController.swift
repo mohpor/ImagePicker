@@ -68,6 +68,7 @@ open class ImagePickerController: UIViewController {
     }()
 
   var volume = AVAudioSession.sharedInstance().outputVolume
+  var cameraPhoto: UIImage?
 
   @objc open weak var delegate: ImagePickerDelegate?
   open var stack = ImageStack()
@@ -84,7 +85,7 @@ open class ImagePickerController: UIViewController {
   open var doneButtonTitle: String? {
     didSet {
       if let doneButtonTitle = doneButtonTitle {
-        bottomContainer.doneButton.setTitle(doneButtonTitle, for: UIControlState())
+        bottomContainer.doneButton.setTitle(doneButtonTitle, for: .normal)
       }
     }
   }
@@ -100,7 +101,7 @@ open class ImagePickerController: UIViewController {
     self.configuration = Configuration()
     super.init(nibName: nibNameOrNil, bundle: nibBundleOrNil)
   }
-  
+
   public required init?(coder aDecoder: NSCoder) {
     self.configuration = Configuration()
     super.init(coder: aDecoder)
@@ -110,14 +111,14 @@ open class ImagePickerController: UIViewController {
 
   open override func viewDidLoad() {
     super.viewDidLoad()
-
+    bottomContainer.stackView.isHidden = PHPhotoLibrary.authorizationStatus() == .denied
     for subview in [cameraController.view, galleryView, bottomContainer, topView] {
       view.addSubview(subview!)
       subview?.translatesAutoresizingMaskIntoConstraints = false
     }
 
     view.addSubview(volumeView)
-    view.sendSubview(toBack: volumeView)
+    view.sendSubviewToBack(volumeView)
 
     view.backgroundColor = UIColor.white
     view.backgroundColor = configuration.mainColor
@@ -161,8 +162,8 @@ open class ImagePickerController: UIViewController {
 
     applyOrientationTransforms()
 
-    UIAccessibilityPostNotification(UIAccessibilityScreenChangedNotification,
-                                    bottomContainer);
+    UIAccessibility.post(notification: UIAccessibility.Notification.screenChanged,
+                         argument: bottomContainer)
   }
 
   open func resetAssets() {
@@ -171,8 +172,8 @@ open class ImagePickerController: UIViewController {
 
   func checkStatus() {
     let currentStatus = PHPhotoLibrary.authorizationStatus()
-    guard currentStatus != .authorized else { return }
-
+    bottomContainer.stackView.isHidden = currentStatus == .denied
+    guard currentStatus != .authorized && currentStatus != .denied else { return }
     if currentStatus == .notDetermined { hideViews() }
 
     PHPhotoLibrary.requestAuthorization { (authorizationStatus) -> Void in
@@ -190,7 +191,7 @@ open class ImagePickerController: UIViewController {
     let alertController = UIAlertController(title: configuration.requestPermissionTitle, message: configuration.requestPermissionMessage, preferredStyle: .alert)
 
     let alertAction = UIAlertAction(title: configuration.OKButtonTitle, style: .default) { _ in
-      if let settingsURL = URL(string: UIApplicationOpenSettingsURLString) {
+      if let settingsURL = URL(string: UIApplication.openSettingsURLString) {
         UIApplication.shared.openURL(settingsURL)
       }
     }
@@ -234,7 +235,7 @@ open class ImagePickerController: UIViewController {
       selector: #selector(adjustButtonTitle(_:)),
       name: NSNotification.Name(rawValue: ImageStack.Notifications.imageDidDrop),
       object: nil)
-    
+
     NotificationCenter.default.addObserver(self,
                                            selector: #selector(dismissIfNeeded),
                                            name: NSNotification.Name(rawValue: ImageStack.Notifications.imageDidDrop),
@@ -252,7 +253,7 @@ open class ImagePickerController: UIViewController {
 
     NotificationCenter.default.addObserver(self,
       selector: #selector(handleRotation(_:)),
-      name: NSNotification.Name.UIDeviceOrientationDidChange,
+      name: UIDevice.orientationDidChangeNotification,
       object: nil)
   }
 
@@ -277,9 +278,9 @@ open class ImagePickerController: UIViewController {
 
     let title = !sender.assets.isEmpty ?
       configuration.doneButtonTitle : configuration.cancelButtonTitle
-    bottomContainer.doneButton.setTitle(title, for: UIControlState())
+    bottomContainer.doneButton.setTitle(title, for: .normal)
   }
-  
+
   @objc func dismissIfNeeded() {
     // If only one image is requested and a push occures, automatically dismiss the ImagePicker
     if imageLimit == 1 {
@@ -348,10 +349,17 @@ open class ImagePickerController: UIViewController {
     guard isBelowImageLimit() && !isTakingPicture else { return }
     isTakingPicture = true
     bottomContainer.pickerButton.isEnabled = false
-    bottomContainer.stackView.startLoader()
+    if PHPhotoLibrary.authorizationStatus() == .authorized {
+      bottomContainer.stackView.startLoader()
+    }
+
     let action: () -> Void = { [weak self] in
       guard let `self` = self else { return }
-      self.cameraController.takePicture { self.isTakingPicture = false }
+      self.cameraController.takePicture { self.isTakingPicture = false
+
+        if PHPhotoLibrary.authorizationStatus() == .denied {
+        }
+      }
     }
 
     if configuration.collapseCollectionViewWhileShot {
@@ -398,6 +406,11 @@ extension ImagePickerController: BottomContainerViewDelegate {
 }
 
 extension ImagePickerController: CameraViewDelegate {
+
+  func didTakePicture(image: UIImage) {
+    self.cameraPhoto = image
+    self.delegate?.doneButtonDidPress(self, images: [image])
+  }
 
   func setFlashButtonHidden(_ hidden: Bool) {
     if configuration.flashButtonAlwaysHidden {
