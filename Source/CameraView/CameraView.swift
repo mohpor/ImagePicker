@@ -231,9 +231,7 @@ class CameraView: UIViewController, CLLocationManagerDelegate, CameraManDelegate
     cameraMan.takePhoto(previewLayer, location: locationManager?.latestLocation) { image in
       completion()
       self.delegate?.imageToLibrary()
-      if let image = image, PHPhotoLibrary.authorizationStatus() == .denied {
-        self.delegate?.didTakePicture(image: image)
-      }
+      self.delegate?.didTakePicture(image: image)
     }
   }
 
