@@ -45,6 +45,7 @@ class ImageStackView: UIView {
     views.forEach { addSubview($0) }
     addSubview(activityView)
     views.first?.alpha = 1
+    self.isHidden = true
   }
 
   required init?(coder aDecoder: NSCoder) {
@@ -115,6 +116,7 @@ extension ImageStackView {
     if let sender = notification.object as? ImageStack {
       renderViews(sender.assets)
       activityView.stopAnimating()
+      self.isHidden = sender.assets.isEmpty
     }
   }
 
@@ -137,7 +139,7 @@ extension ImageStackView {
     }
 
     let photos = Array(assets.suffix(4))
-
+    self.isHidden = photos.isEmpty
     for (index, view) in views.enumerated() {
       if index <= photos.count - 1 {
         AssetManager.resolveAsset(photos[index], size: CGSize(width: Dimensions.imageSize, height: Dimensions.imageSize)) { image in

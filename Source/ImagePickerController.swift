@@ -111,7 +111,10 @@ open class ImagePickerController: UIViewController {
 
   open override func viewDidLoad() {
     super.viewDidLoad()
-    bottomContainer.stackView.isHidden = PHPhotoLibrary.authorizationStatus() == .denied
+    if PHPhotoLibrary.authorizationStatus() == .denied {
+      bottomContainer.stackView.isHidden = true
+    }
+
     for subview in [cameraController.view, galleryView, bottomContainer, topView] {
       view.addSubview(subview!)
       subview?.translatesAutoresizingMaskIntoConstraints = false
@@ -172,7 +175,10 @@ open class ImagePickerController: UIViewController {
 
   func checkStatus() {
     let currentStatus = PHPhotoLibrary.authorizationStatus()
-    bottomContainer.stackView.isHidden = currentStatus == .denied
+    if currentStatus == .denied {
+      bottomContainer.stackView.isHidden = true
+    }
+
     guard currentStatus != .authorized && currentStatus != .denied else { return }
     if currentStatus == .notDetermined { hideViews() }
 
